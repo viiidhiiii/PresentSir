@@ -1,6 +1,7 @@
 """
 PresentSir website (ADDITIONAL work, beyond the brief)
-Mark attendance and Edit a record pages: how the teacher enters and corrects attendance.
+Mark attendance (roll call or quick entry) and Edit a record pages: how the teacher enters
+and corrects attendance.
 Owner: Alicia Jogy (25BTRDC006)
 
 Each render_*() function draws one page. `app` carries the data loaded in website/app.py.
@@ -8,6 +9,7 @@ Each render_*() function draws one page. `app` carries the data loaded in websit
 
 from datetime import date
 
+import pandas as pd
 import streamlit as st
 
 import core_logic as core
@@ -21,7 +23,6 @@ def render_mark(app):
     threshold, lookup, label = app.threshold, app.lookup, app.label
 
     st.title("Mark attendance")
-    st.caption("Everyone is marked present by default. Pick only the students who are **absent**.")
 
     day = st.date_input("Date", value=date.today(), max_value=date.today(), format="YYYY-MM-DD").isoformat()
 
@@ -40,12 +41,36 @@ def render_mark(app):
         default_absent = []
         if overwrite:
             default_absent = [usn for usn, _ in students if usn not in register[day]]
-        absent = st.multiselect(f"Absent on {day} ({ds.weekday_of(day)})",
-                                options=[usn for usn, _ in students], default=default_absent,
-                                format_func=label, placeholder="Search by roll number or name")
+
+        mode = st.radio("How do you want to mark?",
+                        ["Roll call: go down the class list", "Quick: type only the absentees"],
+                        horizontal=True)
+
+        if mode.startswith("Roll call"):
+            st.caption("Everyone starts ticked as present. Call each name and **untick** anyone who doesn't answer.")
+            roll = pd.DataFrame({
+                "Roll": [ds.roll_of(usn) for usn, _ in students],
+                "Name": [name for _, name in students],
+                "Present": [usn not in default_absent for usn, _ in students],
+            })
+            edited = st.data_editor(
+                roll, hide_index=True, width="stretch", height=460,
+                key=f"rollcall-{day}-{overwrite}",
+                disabled=["Roll", "Name"],
+                column_config={"Present": st.column_config.CheckboxColumn("Present", width="small")},
+            )
+            absent = [usn for (usn, _), here in zip(students, edited["Present"]) if not here]
+        else:
+            st.caption("Everyone is marked present by default. Pick only the students who are **absent**.")
+            absent = st.multiselect(f"Absent on {day} ({ds.weekday_of(day)})",
+                                    options=[usn for usn, _ in students], default=default_absent,
+                                    format_func=label, placeholder="Search by roll number or name")
+
         c1, c2, _ = st.columns([1, 1, 3])
         c1.metric("Present", len(students) - len(absent))
         c2.metric("Absent", len(absent))
+        if absent and mode.startswith("Roll call"):
+            st.caption("Absent: " + ", ".join(label(u) for u in absent))
         submitted = st.button("Save attendance", type="primary")
 
         if submitted:
