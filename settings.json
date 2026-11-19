@@ -1,0 +1,12 @@
+{
+  "class_name": "B.Tech CSE (Data Science) - Sem III - Section A",
+  "subject": "Python Programming",
+  "threshold": 75,
+  "working_days": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday"
+  ]
+}
